@@ -28,18 +28,20 @@ typedef struct l_node {
     struct l_node * next;
 }l_node;
 
-int nbr_Vertices;
-int additionalVertices = 0;
+int nombreSommets;
+int sommetsAdditionnels = 0;
 char *ptr;
 struct list_Ty *list;
 struct list_Ty *l;
 
 #define MAXCHAR 1000000
 struct array_Ty* CreateMatrix(char *filePath){
+    // Ouvrir le fichier du graphe
     FILE *file;
     struct array_Ty* Matrix;
     char line[MAXCHAR];
 
+    // Erreur de chargement du fichier
     file = fopen(filePath, "r");
     if (file == NULL) perror("fopen in gm_write_dot");
 
@@ -50,13 +52,13 @@ struct array_Ty* CreateMatrix(char *filePath){
     unpointing_node_list * nodePrv = NULL;
     l_node * l_sommet = NULL;
     printf("Creating Matrix : 1/3 ... ");
-    for (int i = 0; i < nbr_Vertices; i++) {
+
+    //Chercher les noeuds qui ne pointent vers aucuns noeuds puis les stockés dans une liste
+    for (int i = 0; i < nombreSommets; i++) {
         fgets(line, MAXCHAR, file);
         ptr = strtok(line, " ");
         ptr = strtok(NULL, " ");
         int s = atoi(ptr);
-
-        // get list of no pointing vertex---------------------------------------------
         if (s == 0 ) {
             if (nodeList == NULL) {
                 nodeList = malloc(sizeof(*nodeList));
@@ -81,13 +83,14 @@ struct array_Ty* CreateMatrix(char *filePath){
     fclose(file);
 
     printf("2/3 ... ");
-    //get vertexes pointed to no pointing vertexes-----------------------------------
+
+    //    //Chercher les noeuds qui ne sont pointés par aucuns noeuds puis les stockés dans une liste
     file = fopen(filePath, "r");
     if (file == NULL) perror("fopen in gm_write_dot");
     fgets(line, MAXCHAR, file);
     fgets(line, MAXCHAR, file);
 
-    for(int i = 0; i < nbr_Vertices; i++){
+    for(int i = 0; i < nombreSommets; i++){
         fgets(line, MAXCHAR, file);
         ptr = strtok(line, " ");
         int sommet = atoi(ptr);
@@ -120,25 +123,26 @@ struct array_Ty* CreateMatrix(char *filePath){
     }
     fclose(file);
 
+    //Calculer le nombre de sommets additionnel à créer
     nodePrv = nodeList;
     while (nodePrv) {
         l_sommet = nodePrv->list_sommet;
         if (l_sommet) l_sommet = l_sommet->next;
         while (l_sommet){
-            printf("+1\n");
-            additionalVertices += 1;
+            sommetsAdditionnels += 1;
             l_sommet = l_sommet->next;
         }
         nodePrv = nodePrv->next;
     }
 
     printf("3/3\n");
-    //Creating BackSpace Matrix-------------------------------------------------------------
+
+    //Creer la matrice du backSpace-------------------------------------------------------------
     file = fopen(filePath, "r");
     if (file == NULL) perror("fopen in gm_write_dot");
 
     if (fgets(line, MAXCHAR, file) != NULL){
-        Matrix = malloc((nbr_Vertices + additionalVertices) * sizeof(*Matrix));
+        Matrix = malloc((nombreSommets + sommetsAdditionnels) * sizeof(*Matrix));
     }
     fgets(line, MAXCHAR, file);
     nodePrv = nodeList;
@@ -147,7 +151,7 @@ struct array_Ty* CreateMatrix(char *filePath){
     fgets(line, MAXCHAR, file);
     ptr = strtok(line, " ");
     int n = atoi(ptr);
-    while (n <= nbr_Vertices){
+    while (n <= nombreSommets){
         Matrix[i].sommet = n;
         Matrix[i].list = NULL;
         ptr = strtok(NULL, " ");
@@ -265,7 +269,7 @@ void PrintMatrix(array_Ty* matrix, int size){
     }
 }
 
-int get_nbr_Vrtc(char* filePath){
+int getNombreSommets(char* filePath){
     FILE *file;
     char line[MAXCHAR];
     char root[50];
@@ -289,28 +293,36 @@ void convergence(struct array_Ty *Matrix, float * Vector, float *result, float e
     int itr = 0;
     float inter = 0;
     float diff = 10;
-    multiplyConstByMatrix(Matrix, alpha, nbr_Vertices + additionalVertices);
-    while (diff > epsilon){
-        multiplyVectorByMatrix(Matrix, Vector, result, nbr_Vertices + additionalVertices);
 
-        inter = getSomeOfVector(Vector, nbr_Vertices + additionalVertices);
-        inter = inter / (float )(nbr_Vertices + additionalVertices);
+    //Multiplier la matrice par alpha
+    multiplyConstByMatrix(Matrix, alpha, nombreSommets + sommetsAdditionnels);
+    while (diff > epsilon){
+        //Multiplier la matrice par le vecteur X
+        multiplyVectorByMatrix(Matrix, Vector, result, nombreSommets + sommetsAdditionnels);
+
+        //Calculer e^t e 1/N
+        inter = getSomeOfVector(Vector, nombreSommets + sommetsAdditionnels);
+        inter = inter / (float )(nombreSommets + sommetsAdditionnels);
         inter = inter * (1- alpha);
 
-        addConstToVector(result, inter, nbr_Vertices + additionalVertices);
+        //l'ajouter au matrice
+        addConstToVector(result, inter, nombreSommets + sommetsAdditionnels);
         itr++;
         printf("---------------- %d\n", itr);
-        diff = getDiffVectors(Vector, result, nbr_Vertices + additionalVertices);
+
+        //calculer epsilon
+        diff = getDiffVectors(Vector, result, nombreSommets + sommetsAdditionnels);
         printf("%f\n ", diff);
-        copyVectors(Vector, result, nbr_Vertices + additionalVertices);
+        copyVectors(Vector, result, nombreSommets + sommetsAdditionnels);
     }
 }
 
+//Additionner les pertinances des copis des pages pour reduire la taille du vecteur de partinance à la taille initial
 void reduceVector(float * Vector, array_Ty* matrix){
     int j = 0;
     int sommet;
     float som = 0.0f;
-    for (int i = 0; i < nbr_Vertices; i++){
+    for (int i = 0; i < nombreSommets; i++){
         sommet = matrix[j].sommet;
         while(matrix[j].sommet == sommet){
             som += Vector[j];
@@ -324,31 +336,36 @@ void reduceVector(float * Vector, array_Ty* matrix){
 int main() {
     //---------------------Déclaration & initialisation-----------------------------------------------------------------
     clock_t t;
-    char* filePath = "C:\\Users\\OsmOlr\\Desktop\\mod&sim_data\\Grand graphe aleatoire regulier.txt";
+    char* filePath = "C:\\Users\\OsmOlr\\Desktop\\mod&sim_data\\Exemple.txt";
     float alpha = 0.85f;
-    nbr_Vertices = get_nbr_Vrtc(filePath);
+    nombreSommets = getNombreSommets(filePath);
 
     t = clock();
     //---------------------Back Space-----------------------------------------------------------------------------------
 
     array_Ty* Matrix = CreateMatrix(filePath);
 
-    float *X = malloc((nbr_Vertices + additionalVertices) * sizeof(float ));
-    initializeVector(X, -1, nbr_Vertices + additionalVertices);
-    float *result = malloc((nbr_Vertices + additionalVertices) * sizeof(float ));
-    initializeVector(result, 0, nbr_Vertices + additionalVertices);
+    float *X = malloc((nombreSommets + sommetsAdditionnels) * sizeof(float ));
+    initializeVector(X, -1, nombreSommets + sommetsAdditionnels);
+    float *result = malloc((nombreSommets + sommetsAdditionnels) * sizeof(float ));
+    initializeVector(result, 0, nombreSommets + sommetsAdditionnels);
 
     //------------------------------------------------------------------------------------------------------------------
     t = clock() - t;
     double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
-    printf("\nLa création de structure de la matrice a pris %f seconds\n", time_taken);
+    printf("\nLa creation de structure de la matrice a pris %f seconds\n", time_taken);
     t = clock();
     //------------------------------------------------------------------------------------------------------------------
 
     convergence(Matrix, X, result, 0.000001f, alpha);
-    printf("Nouveaux noeuds crées : %d\n", additionalVertices);
+    printf("Nouveaux noeuds crees : %d\n", sommetsAdditionnels);
+
+    printVector(X, nombreSommets+ sommetsAdditionnels);
 
     reduceVector(X, Matrix);
+
+    printf("\n vecteur de pertinance: ");
+    printVector(X, nombreSommets);
 
     //---------------------fin surfer aléatoire-------------------------------------------------------------------------
     t = clock() - t;
